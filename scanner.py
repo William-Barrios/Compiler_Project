@@ -1,9 +1,13 @@
 
 import re
-
+from parser import Parser
 class TokenType:
     IDENTIFIER = 'IDENTIFIER'
-    INTEGER = 'INTEGER'
+    L_INTEGER = 'L_INTEGER'
+    L_CHAR = 'L_CHAR'
+    L_STRING = 'L_STRING'
+    L_BOOLEAN = 'L_BOOLEAN'
+    INTEGER = 'integer'
     ASSIGN_OP = 'ASSIGN_OP'
     ADD_OP = 'ADD_OP'
     OR_LOG = 'OR_LOG'
@@ -28,12 +32,10 @@ class TokenType:
     BOOL_D = 'BOOL_D'
     CHAR_D ='CHAR_D'
     ELSE_D = 'ELSE_D'
-    FALSE_D = 'FALSE_D'
     FOR_D = 'FOR_D'
     MOD = 'MOD'
     DECLA_OP = 'DECLA_OP'
     STRING_D = 'STRING'
-    TRUE_D = 'TRUE'
     VOID_D = 'VOID'
     IF_D = 'IF'
     RETURN_D = 'RETURN'
@@ -48,6 +50,7 @@ class TokenType:
     GREAT_OP = 'GREAT_OP'
     GREATEQ_OP = 'GREATEQ_OP'
     COMA = "COMA"
+    FIN_L = 'FIN_L'
 
 class Token:
     def __init__(self, type, value, line, column):
@@ -66,10 +69,11 @@ file_index = 0
 
 keywords = {
     "array": TokenType.ARRAY_D,
+    "integer": TokenType.INTEGER,
     "boolean": TokenType.BOOL_D,
     "char": TokenType.CHAR_D,
     "else": TokenType.ELSE_D,
-    "false": TokenType.FALSE_D,
+    "false": TokenType.L_BOOLEAN,
     "for": TokenType.FOR_D,
     "function":TokenType.FUNCTION_D,
     "if": TokenType.IF_D,
@@ -77,7 +81,7 @@ keywords = {
     "print": TokenType.PRINT_KEY,
     "return": TokenType.RETURN_D,
     "string": TokenType.STRING_D,
-    "true": TokenType.TRUE_D,
+    "true": TokenType.L_BOOLEAN,
     "void": TokenType.VOID_D,
     "while": TokenType.WHILE_D
 }
@@ -120,7 +124,6 @@ def skip_multi_line_comment():
             print("ERROR SCAN - Unclosed multi-line comment")
             break
 
-# Function to get the next token
 def get_token():
     token = None
     while getchar() is not None:
@@ -136,17 +139,28 @@ def get_token():
                 key_identifier = keywords[identifier]
                 token = Token(key_identifier, identifier, current_line, start_column)
                 print(f"DEBUG SCAN - KEYWORD [ {identifier} ] of type [{key_identifier}] found at ({current_line}:{start_column})")
-                
             else:
                 token = Token(TokenType.IDENTIFIER, identifier, current_line, start_column)
                 print(f"DEBUG SCAN - IDENTIFIER [ {identifier} ] found at ({current_line}:{start_column})")
+        
         elif current_char.isdigit():  # Check for integers
             start_column = current_column
             number = current_char
             while peekchar() and peekchar().isdigit():
                 number += getchar()
-            token = Token(TokenType.INTEGER, number, current_line, start_column)
-            print(f"DEBUG SCAN - INTEGER [ {number} ] found at ({current_line}:{start_column})")
+            token = Token(TokenType.L_INTEGER, number, current_line, start_column)
+            print(f"DEBUG SCAN - L_INTEGER [ {number} ] found at ({current_line}:{start_column})")
+        
+        elif current_char == "'":  # Detecting char literals
+            start_column = current_column
+            char_value = getchar()  # Get the character
+            if peekchar() == "'":  # Check if the next character is the closing quote
+                getchar()  # Skip the closing quote
+                token = Token(TokenType.L_CHAR, char_value, current_line, start_column)
+                print(f"DEBUG SCAN - L_CHAR [ '{char_value}' ] found at ({current_line}:{start_column})")
+            else:
+                print(f"ERROR SCAN - Unclosed char literal starting at ({current_line}:{start_column})")
+        
         elif current_char == '=':
             if peekchar() == '=':
                 token = Token(TokenType.COMPARE_OP, '==', current_line, current_column)
@@ -156,6 +170,14 @@ def get_token():
             else:
                 token = Token(TokenType.ASSIGN_OP, '=', current_line, current_column)
                 print(f"DEBUG SCAN - ASSIGN_OP [ = ] found at ({current_line}:{current_column})")
+        elif current_char == '{':
+            token = Token(TokenType.KEYS_O, '{', current_line, current_column)
+            print(f"DEBUG SCAN - KEYS_O [ {{ ] found at ({current_line}:{current_column})")
+
+        elif current_char == '}':
+            token = Token(TokenType.KEYS_C, '}', current_line, current_column)
+            print(f"DEBUG SCAN - KEYS_C [ }} ] found at ({current_line}:{current_column})")
+        
         elif current_char == '+':
             if peekchar() == '+':
                 token = Token(TokenType.INCR_OP, '++', current_line, current_column)
@@ -164,122 +186,57 @@ def get_token():
             else:   
                 token = Token(TokenType.ADD_OP, '+', current_line, current_column)
                 print(f"DEBUG SCAN - ADD_OP [ + ] found at ({current_line}:{current_column})")
-        elif current_char == '-':
-            if peekchar() == '-':
-                token = Token(TokenType.DECR_OP, '--', current_line, current_column)
-                print(f"DEBUG SCAN - DECR_OP [ -- ] found at ({current_line}:{current_column})")
-                getchar()
-            else:
-                token = Token(TokenType.SUB_OP, '-', current_line, current_column)
-                print(f"DEBUG SCAN - SUB_OP [ - ] found at ({current_line}:{current_column})")
-        elif current_char == '(':
-            token = Token(TokenType.OPEN_PAR, '(', current_line, current_column)
-            print(f"DEBUG SCAN - OPEN_PAR [ ( ] found at ({current_line}:{current_column})")
-
-        elif current_char == '^':
-            token = Token(TokenType.POW, '^', current_line, current_column)
-            print(f"DEBUG SCAN - POW [ ^ ] found at ({current_line}:{current_column})")
-        elif current_char == '"':
-            start_column = current_column
-            string_value=current_char
-            while True:
-                #next_char = getchar()
-                if peekchar() == None:
-                    print(f"ERROR SCAN - Unclosed string starting at ({current_line}:{start_column})")
-                    return Token(TokenType.UNKNOWN, string_value, current_line, start_column)
-                if peekchar() == '"':  # String end detected
-                    token = Token(TokenType.STRING_D, string_value, current_line, start_column)
-                    string_value += getchar()
-                    print(f"DEBUG SCAN - STRING [ {string_value} ] found at ({current_line}:{start_column})")
-                    break
-                string_value += getchar()
-        elif current_char == '%':
-            token = Token(TokenType.MOD, '%', current_line, current_column)
-            print(f"DEBUG SCAN - MOD [ % ] found at ({current_line}:{current_column})")
-        elif current_char == ':':
-            token = Token(TokenType.DECLA_OP, ':', current_line, current_column)
-            print(f"DEBUG SCAN - DECLA_OP [ : ] found at ({current_line}:{current_column})")
-        elif current_char == '{':
-            token = Token(TokenType.KEYS_C, '{', current_line, current_column)
-            print("DEBUG SCAN - KEYS_O [" + " { ] found at",end=' ')
-            print(f"({current_line}:{current_column})")
-        elif current_char == '}':
-            token = Token(TokenType.KEYS_O, '}', current_line, current_column)
-            print("DEBUG SCAN - KEYS_O [" + " } ] found at",end=' ')
-            print(f"({current_line}:{current_column})")
-
-        elif current_char == ',':
-            token = Token(TokenType.COMA, ',', current_line, current_column)
-            print(f"DEBUG SCAN - COMA [ , ] found at ({current_line}:{current_column})")
         elif current_char == ';':
-            token = Token(TokenType.FIN_L, ';', current_line, current_column)
-            print(f"DEBUG SCAN - FIN_L [ ; ] found at ({current_line}:{current_column})")
-        elif current_char == "'":
-            token = Token(TokenType.CHAR_D, "'", current_line, current_column)
-            print(f"DEBUG SCAN - CHAR_D [ ' ] found at ({current_line}:{current_column})")
-        elif current_char == '!':
-            if peekchar()== '=':
-                token = Token(TokenType.DIFF_OP, '!=', current_line, current_column)
-                print(f"DEBUG SCAN - DIFF_OP [!=] found at ({current_line}:{current_column})")
-                getchar()
-            else:
-                token = Token(TokenType.NEG_OP, '!', current_line, current_column)
-                print(f"DEBUG SCAN - NEG_OP [ ! ] found at ({current_line}:{current_column})")
-        elif current_char == '|':
-            if peekchar()== '|':
-                token = Token(TokenType.OR_LOG, '||', current_line, current_column)
-                print(f"DEBUG SCAN - OR_LOG [||] found at ({current_line}:{current_column})")
-                getchar()
-        elif current_char == ')':
-            token = Token(TokenType.CLOSE_PAR, ')', current_line, current_column)
-            print(f"DEBUG SCAN - CLOSE_PAR [ ) ] found at ({current_line}:{current_column})")
-        elif current_char == '[':
-            token = Token(TokenType.OPEN_CHE, '[', current_line, current_column)
-            print(f"DEBUG SCAN - OPEN_CHE [ [ ] found at ({current_line}:{current_column})")
-        elif current_char == ']':
-            token = Token(TokenType.CLOSE_CHE, ']', current_line, current_column)
-            print(f"DEBUG SCAN - CLOSE_CHE [ ] ] found at ({current_line}:{current_column})")
-        elif current_char == '*':
-            token = Token(TokenType.MULT, '*', current_line, current_column)
-            print(f"DEBUG SCAN - MULT [ * ] found at ({current_line}:{current_column})")
-        elif current_char == '$':
-            token = Token(TokenType.EOP, '$', current_line, current_column)
-            print(f"DEBUG SCAN - EOP [ $ ] found at ({current_line}:{current_column})")
-        elif current_char == '/':
-            if peekchar() == '/':  # Single-line comment
-                skip_single_line_comment()
-            elif peekchar() == '*':  # Multi-line comment
-                skip_multi_line_comment()
-            else:
-                token = Token(TokenType.DIV, '/', current_line, current_column)
-                print(f"DEBUG SCAN - DIV [ / ] found at ({current_line}:{current_column})")
+                token = Token(TokenType.FIN_L, ';', current_line, current_column)
+                print(f"DEBUG SCAN - FIN_L [ ; ] found at ({current_line}:{current_column})")
         elif current_char == '<':
-            if peekchar()== '=':
+            if peekchar() == '=':
                 token = Token(TokenType.MINOREQ_OP, '<=', current_line, current_column)
-                print(f"DEBUG SCAN - MINOREQ_OP [<=] found at ({current_line}:{current_column})")
+                print(f"DEBUG SCAN - MINOREQ_OP [ <= ] found at ({current_line}:{current_column})")
                 getchar()
             else:
                 token = Token(TokenType.MINOR_OP, '<', current_line, current_column)
                 print(f"DEBUG SCAN - MINOR_OP [ < ] found at ({current_line}:{current_column})")
         elif current_char == '>':
-            if peekchar()== '=':
+            if peekchar() == '=':
                 token = Token(TokenType.GREATEQ_OP, '>=', current_line, current_column)
-                print(f"DEBUG SCAN - MINOREQ_OP [>=] found at ({current_line}:{current_column})")
+                print(f"DEBUG SCAN - GREATEQ_OP [ >= ] found at ({current_line}:{current_column})")
                 getchar()
             else:
-                token = Token(TokenType.GREAT_OP, '<', current_line, current_column)
-                print(f"DEBUG SCAN - GREAT_OP [ < ] found at ({current_line}:{current_column})")
-        elif current_char == '&':
-            if peekchar()== '&':
-                token = Token(TokenType.ANDLOG, '&&', current_line, current_column)
-                print(f"DEBUG SCAN - ANDLOG [&&] found at ({current_line}:{current_column})")
-                getchar()
-            else:
-                token = Token(TokenType.UNKNOWN, '&', current_line, current_column)
-                print(f"DEBUG SCAN - UNKNOWN [ & ] found at ({current_line}:{current_column})")
-        else:
-            token = Token(TokenType.UNKNOWN, current_char, current_line, current_column)
-            print(f"ERROR SCAN - Unknown token [ {current_char} ] at ({current_line}:{current_column})")
+                token = Token(TokenType.GREAT_OP, '>', current_line, current_column)
+                print(f"DEBUG SCAN - GREAT_OP [ > ] found at ({current_line}:{current_column})")
+        elif current_char == '-':
+                token = Token(TokenType.SUB_OP, '-', current_line, current_column)
+                print(f"DEBUG SCAN - SUB_OP [ - ] found at ({current_line}:{current_column})")
+        elif current_char == '!':
+                token = Token(TokenType.NEG_OP, '!', current_line, current_column)
+                print(f"DEBUG SCAN - NEG_OP [ ! ] found at ({current_line}:{current_column})")
+        
+        elif current_char == '(':
+            token = Token(TokenType.OPEN_PAR, '(', current_line, current_column)
+            print(f"DEBUG SCAN - OPEN_PAR [ ( ] found at ({current_line}:{current_column})")
+        
+        elif current_char == ')':
+            token = Token(TokenType.CLOSE_PAR, ')', current_line, current_column)
+            print(f"DEBUG SCAN - CLOSE_PAR [ ) ] found at ({current_line}:{current_column})")
+
+        elif current_char == '^':
+            token = Token(TokenType.POW, '^', current_line, current_column)
+            print(f"DEBUG SCAN - POW [ ^ ] found at ({current_line}:{current_column})")
+        
+        elif current_char == '"':
+            start_column = current_column
+            string_value = ''
+            while True:
+                if peekchar() == None:
+                    print(f"ERROR SCAN - Unclosed string starting at ({current_line}:{start_column})")
+                    return Token(TokenType.UNKNOWN, string_value, current_line, start_column)
+                if peekchar() == '"':  # String end detected
+                    getchar()  # Skip the closing quote
+                    break
+                string_value += getchar()
+            token = Token(TokenType.L_STRING, string_value, current_line, start_column)
+            print(f"DEBUG SCAN - L_STRING [ \"{string_value}\" ] found at ({current_line}:{start_column})")
         
         if token:
             return token
@@ -295,11 +252,13 @@ def scan_file(filename):
     tokens_list = []
     while peekchar() is not None:
         tokens_list.append(get_token())
-    print("holis")
-
     
+    return tokens_list  # Devuelve la lista de tokens
 
 
-scan_file('main.txt')
+tokens = scan_file('main.txt')  # Usando tu scanner para generar tokens
+parser = Parser(tokens)
+parser.parse()
+
 
 

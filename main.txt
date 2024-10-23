@@ -1,24 +1,16 @@
-x: integer = 65;
-y: char = 'A';
-if(x>y) ... // error: x and y are of different types!
-a/3
-
-@
-/*f: integer = 0;
-if(f) ...      // error: f is not a boolean!
-
-writechar: function void ( char c );
-a: integer = 65;
-writechar(a);  // error: a is not a char!
-
-b: array [2] boolean = {true,false};
-x: integer = 0;
-x = b[0];      // error: x is not a boolean!*/
-
-
-printarray: function void ( a: array [] integer, size: integer ) = {
-	i: integer;
-	for( i=0;i<size;i++) {
-		print a[i], "\n";
-	}
+integer asd = 5 + 1 ;
+integer sdf = 5 < 1 ;
+boolean a = ! b ;
+a = ! b ;
+void myFunction (){
+    integer a = 18;
+    print(a);
+    if (a<b)
+        a = 5 + 1;
+    else
+        a = 1;
+    
+    return a;
 }
+
+integer = myFunction () ;
