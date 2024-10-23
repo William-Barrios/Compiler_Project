@@ -2,13 +2,13 @@ integer a = !4;
 void myFunction (){
     if (a<b)
         a = !4;
-        if (oscar < gay)
-            oscar = gay;
+        x = !4;
+        if (oscar > 10)
+            oscar = 0;
         else
-            oscar = homosexual;
+            oscar = 10;
     else
         a = 1;
-    
     return a;
 }
 integer b = myFunction () ;

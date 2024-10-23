@@ -206,6 +206,10 @@ class Parser:
             self.expect(TokenType.KEYS_C)
         else:
             self.Declaration()
+        if self.current_token and self.current_token.type in {TokenType.IF_D, TokenType.FOR_D, TokenType.RETURN_D,
+                                                              TokenType.PRINT_KEY, TokenType.IDENTIFIER, TokenType.KEYS_O,TokenType.INTEGER,
+                                                              TokenType.CHAR_D, TokenType.STRING_D, TokenType.BOOL_D}:
+            self.Statement()
 
     # IfStmt ::= if ( Expression ) Statement else Statement
     def IfStmt(self):
@@ -226,7 +230,9 @@ class Parser:
         self.expect(TokenType.FIN_L)
         self.ExprStmt()
         self.expect(TokenType.CLOSE_PAR)
+        self.expect(TokenType.KEYS_O)
         self.Statement()
+        self.expect(TokenType.KEYS_C)
 
     # ReturnStmt ::= return Expression ;
     def ReturnStmt(self):
@@ -247,11 +253,12 @@ class Parser:
         self.Expression()
         if self.current_token and self.current_token.type == TokenType.ASSIGN_OP:
             self.AssignExpr()
-        self.expect(TokenType.FIN_L)
+        if self.current_token and self.current_token.type == TokenType.FIN_L:
+            self.expect(TokenType.FIN_L)
     
     def AssignExpr(self):
         self.expect(TokenType.ASSIGN_OP)
-        self.Unary()
+        self.Expr()
         
     # ExprList ::= Expression ExprList'
     def ExprList(self):

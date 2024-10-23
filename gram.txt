@@ -31,16 +31,19 @@ Statement ::= ExprStmt
 Statement ::= PrintStmt 
 Statement ::= { StmtList }
 IfStmt ::= if (Expression) Statement else Statement
-ForStmt ::= for (ExprStmt Expression ; ExprStmt) Statement
+ForStmt ::= for (ExprStmt Expression ; ExprStmt) {Statement}
 ReturnStmt ::= return Expression ;
 PrintStmt ::= print ( ExprList ) ;
-ExprStmt ::= Expression ;
+ExprStmt ::= Expression AssignExpr FIN'
+FIN' ::= ;
+FIN' ::= '' 
 ExprList ::= Expression ExprList'               
 ExprList' ::= , ExprList 
 ExprList' ::= ''
-AssignExpr ::= Identifier = Expression           
+AssignExpr ::= = Unary
+AssignExpr ::= ''
 Expression ::= OrExpr
-OrExpr ::= AndExpr OrExpr'                       
+OrExpr ::= AndEexpr OrExpr'                       
 OrExpr' ::= || AndExpr OrExpr' 
 OrExpr' ::= ''
 AndExpr ::= EqExpr AndExpr'                      
