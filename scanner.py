@@ -65,6 +65,7 @@ current_line = 1
 current_column = 0
 file_content = None
 file_index = 0
+errorScanner = False
 
 
 keywords = {
@@ -91,7 +92,7 @@ def is_keyword(word):
 
 
 def getchar():
-    global file_index, current_char, current_line, current_column
+    global file_index, current_char, current_line, current_column, errorScanner
     if file_index < len(file_content):
         current_char = file_content[file_index]
         file_index += 1
@@ -125,6 +126,7 @@ def skip_multi_line_comment():
             break
 
 def get_token():
+    global errorScanner
     token = None
     while getchar() is not None:
         if current_char.isspace():
@@ -237,8 +239,11 @@ def get_token():
                 string_value += getchar()
             token = Token(TokenType.L_STRING, string_value, current_line, start_column)
             print(f"DEBUG SCAN - L_STRING [ \"{string_value}\" ] found at ({current_line}:{start_column})")
-        
-        if token:
+        else: 
+            errorScanner = True
+            print(f"ERROR SCAN [ \"{current_char}\" ] found at ({current_line}:{current_column})")
+
+        if token and errorScanner == False:
             return token
     return None
 
@@ -257,8 +262,9 @@ def scan_file(filename):
 
 
 tokens = scan_file('main.txt')  # Usando tu scanner para generar tokens
-parser = Parser(tokens)
-parser.parse()
+if errorScanner == False:
+    parser = Parser(tokens)
+    parser.parse()
 
 
 

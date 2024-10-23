@@ -48,7 +48,7 @@ class TokenType:
     GREATEQ_OP = 'GREATEQ_OP'
     COMA = "COMA"
     FIN_L = 'FIN_L'
-    
+
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -74,7 +74,6 @@ class Parser:
     def parse(self):
         return self.Program()
 
-    # Program ::= Declaration Program'
     def Program(self):
         self.Declaration()
         self.ProgramPrime()
@@ -246,8 +245,14 @@ class Parser:
     # ExprStmt ::= Expression ;
     def ExprStmt(self):
         self.Expression()
+        if self.current_token and self.current_token.type == TokenType.ASSIGN_OP:
+            self.AssignExpr()
         self.expect(TokenType.FIN_L)
-
+    
+    def AssignExpr(self):
+        self.expect(TokenType.ASSIGN_OP)
+        self.Unary()
+        
     # ExprList ::= Expression ExprList'
     def ExprList(self):
         self.Expression()
