@@ -1,3 +1,4 @@
+from treeAST import *
 class TokenType:
     IDENTIFIER = 'IDENTIFIER'
     L_INTEGER = 'L_INTEGER'
@@ -18,7 +19,7 @@ class TokenType:
     CLOSE_CHE = 'CLOSE_CHE'
     EOP = 'EOP'
     KEYS_O = 'KEYS_O'
-    KEYS_C = 'KEYS_'
+    KEYS_C = 'KEYS_C'
     POW = 'POW'
     FIN_L = 'FIN_L'
     INCR_OP = 'INCR_OP'
@@ -49,6 +50,8 @@ class TokenType:
     COMA = "COMA"
     FIN_L = 'FIN_L'
 
+errores = 0
+recoveri = False
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -63,18 +66,33 @@ class Parser:
             self.current_token = None  # End of input
 
     def expect(self, token_type):
+        global recoveri
         if self.current_token and self.current_token.type == token_type:
+            recoveri = False
             self.get_next_token()
         else:
             self.error(f"Expected {token_type}, found {self.current_token.type}")
+            self.recover()
+            
+            recoveri =True
 
     def error(self, message):
-        raise Exception(f"Parse error: {message}")
+        global errores
+        errores += 1
+        print(f"Error {errores}: {message} at token {self.tokens[self.current_token_index-1].line}:{self.tokens[self.current_token_index-1].column+1}")
+        self.recover()
+
+    def recover(self):
+        # Recupera el flujo hasta el próximo punto seguro (;)
+        while self.current_token and self.current_token.type != TokenType.FIN_L:
+            self.get_next_token()
+        
 
     def parse(self):
         return self.Program()
 
     def Program(self):
+        program_node = ProgramNode() 
         self.Declaration()
         self.ProgramPrime()
 
@@ -84,6 +102,10 @@ class Parser:
                                                                TokenType.STRING_D, TokenType.VOID_D}:
             self.Declaration()
             self.ProgramPrime()
+        
+
+
+        
         # Empty production
 
     # Declaration ::= AUX PRAG
@@ -93,8 +115,11 @@ class Parser:
 
     # AUX ::= Type Identifier
     def AUX(self):
+        global recoveri
         self.Type()
         self.expect(TokenType.IDENTIFIER)
+        if recoveri == True:
+            return
 
     # Type ::= BaseType Type'
     def Type(self):
@@ -118,15 +143,20 @@ class Parser:
 
     # Type' ::= [ ] Type' | ''
     def TypePrime(self):
+        global recoveri
         if self.current_token and self.current_token.type == TokenType.OPEN_CHE:
             self.expect(TokenType.OPEN_CHE)
             self.expect(TokenType.CLOSE_CHE)
+            if recoveri == True:
+                recoveri =False
+                return
             self.TypePrime()
         # Empty production
 
     # PRAG ::= VarDecl | Function
     # PRAG ::= VarDecl | Function | ';'
     def PRAG(self):
+        global recoveri
         if self.current_token and self.current_token.type == TokenType.ASSIGN_OP:
             self.VarDecl()
         elif self.current_token and self.current_token.type == TokenType.OPEN_PAR:
@@ -134,7 +164,8 @@ class Parser:
         elif self.current_token and self.current_token.type == TokenType.FIN_L:  # Detectar fin de línea
             self.expect(TokenType.FIN_L)
         else:
-            self.error("Expected VarDecl, Function, or ';'")
+            self.error(f"Expected =, ( or ;  found {self.current_token.type}")
+            self.expect(TokenType.FIN_L)
 
 
     # VarDecl ::= = Expression ; | ;
@@ -146,12 +177,25 @@ class Parser:
 
     # Function ::= ( Params ) { StmtList }
     def Function(self):
+        global recoveri
         self.expect(TokenType.OPEN_PAR)
+        if recoveri == True:
+            recoveri =False
+            return
         self.Params()
         self.expect(TokenType.CLOSE_PAR)
+        if recoveri == True:
+            recoveri =False
+            return
         self.expect(TokenType.KEYS_O)
+        if recoveri == True:
+            recoveri =False
+            return
         self.StmtList()
         self.expect(TokenType.KEYS_C)
+        if recoveri == True:
+            recoveri =False
+            return
 
     # Params ::= Type Identifier Params' | ''
     def Params(self):
@@ -206,33 +250,55 @@ class Parser:
             self.expect(TokenType.KEYS_C)
         else:
             self.Declaration()
-        if self.current_token and self.current_token.type in {TokenType.IF_D, TokenType.FOR_D, TokenType.RETURN_D,
-                                                              TokenType.PRINT_KEY, TokenType.IDENTIFIER, TokenType.KEYS_O,TokenType.INTEGER,
-                                                              TokenType.CHAR_D, TokenType.STRING_D, TokenType.BOOL_D}:
-            self.Statement()
 
     # IfStmt ::= if ( Expression ) Statement else Statement
     def IfStmt(self):
+        global recoveri
         self.expect(TokenType.IF_D)
         self.expect(TokenType.OPEN_PAR)
+        if recoveri == True:
+            recoveri = False
+            return
         self.Expression()
         self.expect(TokenType.CLOSE_PAR)
+        if recoveri == True:
+            recoveri = False
+            return
         self.Statement()
         self.expect(TokenType.ELSE_D)
+        if recoveri == True:
+            recoveri = False
+            return
         self.Statement()
 
     # ForStmt ::= for ( ExprStmt Expression ; ExprStmt ) Statement
     def ForStmt(self):
+        global recoveri
         self.expect(TokenType.FOR_D)
         self.expect(TokenType.OPEN_PAR)
+        if recoveri == True:
+            recoveri = False
+            return
         self.ExprStmt()
         self.Expression()
         self.expect(TokenType.FIN_L)
+        if recoveri == True:
+            recoveri = False
+            return
         self.ExprStmt()
         self.expect(TokenType.CLOSE_PAR)
+        if recoveri == True:
+            recoveri = False
+            return
         self.expect(TokenType.KEYS_O)
+        if recoveri == True:
+            recoveri = False
+            return
         self.Statement()
         self.expect(TokenType.KEYS_C)
+        if recoveri == True:
+            recoveri = False
+            return
 
     # ReturnStmt ::= return Expression ;
     def ReturnStmt(self):
@@ -242,19 +308,36 @@ class Parser:
 
     # PrintStmt ::= print ( ExprList ) ;
     def PrintStmt(self):
+        global recoveri
         self.expect(TokenType.PRINT_KEY)
         self.expect(TokenType.OPEN_PAR)
+        if recoveri == True:
+            self.expect(TokenType.FIN_L)
+            recoveri =False
+            return
         self.ExprList()
         self.expect(TokenType.CLOSE_PAR)
+        if recoveri == True:
+            self.expect(TokenType.FIN_L)
+            recoveri =False
+            return
         self.expect(TokenType.FIN_L)
+        if recoveri == True:
+            recoveri =False
+            return
 
     # ExprStmt ::= Expression ;
     def ExprStmt(self):
+        global recoveri
+        assig = False
         self.Expression()
         if self.current_token and self.current_token.type == TokenType.ASSIGN_OP:
+            assig = True
             self.AssignExpr()
-        if self.current_token and self.current_token.type == TokenType.FIN_L:
+        if assig == True:
             self.expect(TokenType.FIN_L)
+            if recoveri==True:
+                self.expect(TokenType.FIN_L)
     
     def AssignExpr(self):
         self.expect(TokenType.ASSIGN_OP)
@@ -407,19 +490,28 @@ class Parser:
 
     # FactorR ::= Factor' | ( ExprList ) Factor'
     def FactorR(self):
+        global recoveri
         if self.current_token and self.current_token.type == TokenType.OPEN_PAR:
             self.expect(TokenType.OPEN_PAR)
             self.ExprList()
             self.expect(TokenType.CLOSE_PAR)
+            global recoveri
+            if recoveri == True:
+                recoveri =False
+                return
             self.FactorPrime()
         else:
             self.FactorPrime()
 
     # Factor' ::= [ Expression ] Factor' | ''
     def FactorPrime(self):
+        global recoveri
         if self.current_token and self.current_token.type == TokenType.OPEN_CHE:
             self.expect(TokenType.OPEN_CHE)
             self.Expression()
             self.expect(TokenType.CLOSE_CHE)
+            if recoveri == True:
+                recoveri =False
+                return
             self.FactorPrime()
         # Empty production

@@ -1,14 +1,21 @@
-integer a = !4; 
+integer x;
 void myFunction (){
-    if (a<b)
+    if (a<b){
         a = !4;
         x = !4;
-        if (oscar > 10)
+        if (oscar > 10){
             oscar = 0;
-        else
-            oscar = 10;
-    else
+            oscar = 7;
+        }
+        else{
+            oscar = --1;
+        }
+    } else {
         a = 1;
-    return a;
+        return a;
+    }
+    for (x = 0; x < 10; x = x + 1;) {
+        print(x);
+    }
 }
-integer b = myFunction () ;
+integer b = myFunction (-5, "hola", true) ;
