@@ -89,19 +89,24 @@ class Parser:
         
 
     def parse(self):
-        return self.Program()
+        global errores
+        return self.Program(), errores
 
     def Program(self):
-        program_node = ProgramNode() 
-        self.Declaration()
-        self.ProgramPrime()
+        ret = NodoAST("Program")
+        ret.agregar_hijo(self.Declaration())
+        ret.agregar_hijo(self.ProgramPrime())
+        return ret
 
     # Program' ::= Declaration Program' | ''
     def ProgramPrime(self):
+        ret = NodoAST("ProgramP")
         if self.current_token and self.current_token.type in {TokenType.INTEGER, TokenType.BOOL_D, TokenType.CHAR_D,
                                                                TokenType.STRING_D, TokenType.VOID_D}:
-            self.Declaration()
-            self.ProgramPrime()
+            ret.agregar_hijo(self.Declaration())
+            ret.agregar_hijo(self.ProgramPrime())
+            return ret
+        return None
         
 
 
@@ -110,47 +115,70 @@ class Parser:
 
     # Declaration ::= AUX PRAG
     def Declaration(self):
-        self.AUX()
-        self.PRAG()
+        ret = NodoAST("Declaration")
+        izq = self.AUX()
+        der = self.PRAG()
+        if der:
+            der.hijos= [izq] + der.hijos
+            ret.agregar_hijo(der)
+            return ret
+        return ret.agregar_hijo(izq)
+        
 
     # AUX ::= Type Identifier
     def AUX(self):
         global recoveri
-        self.Type()
+        ret = NodoAST("Aux")
+        ret.agregar_hijo(self.Type())
+        ret.agregar_hijo(NodoAST(self.current_token.value))
         self.expect(TokenType.IDENTIFIER)
         if recoveri == True:
-            return
+            return None
+        return ret
 
     # Type ::= BaseType Type'
     def Type(self):
-        self.BaseType()
-        self.TypePrime()
+        ret = NodoAST("Type")
+        ret.agregar_hijo(self.BaseType())
+        ret.agregar_hijo(self.TypePrime())
+        return ret
 
     # BaseType ::= IntType | BoolType | CharType | StringType | Void
     def BaseType(self):
         if self.current_token.type == TokenType.INTEGER:
             self.expect(TokenType.INTEGER)
+            return NodoAST("integer")
         elif self.current_token.type == TokenType.BOOL_D:
             self.expect(TokenType.BOOL_D)
+            return NodoAST("boolean")
         elif self.current_token.type == TokenType.CHAR_D:
             self.expect(TokenType.CHAR_D)
+            return NodoAST("char")
         elif self.current_token.type == TokenType.STRING_D:
             self.expect(TokenType.STRING_D)
+            return NodoAST("string")
         elif self.current_token.type == TokenType.VOID_D:
             self.expect(TokenType.VOID_D)
+            return NodoAST("void")
         else:
             self.error("Expected base type")
+            return None
 
     # Type' ::= [ ] Type' | ''
     def TypePrime(self):
+        typ = NodoAST("typePrime")
+        ret = None
         global recoveri
         if self.current_token and self.current_token.type == TokenType.OPEN_CHE:
+            ret = NodoAST("[]")
             self.expect(TokenType.OPEN_CHE)
             self.expect(TokenType.CLOSE_CHE)
             if recoveri == True:
                 recoveri =False
-                return
-            self.TypePrime()
+                return None
+            ret.agregar_hijo(self.TypePrime())
+            return NodoAST.agregar_hijo(ret)
+        return None
         # Empty production
 
     # PRAG ::= VarDecl | Function
@@ -158,59 +186,74 @@ class Parser:
     def PRAG(self):
         global recoveri
         if self.current_token and self.current_token.type == TokenType.ASSIGN_OP:
-            self.VarDecl()
+            return NodoOperador("=",None, self.VarDecl())
         elif self.current_token and self.current_token.type == TokenType.OPEN_PAR:
-            self.Function()
+            return self.Function()
         elif self.current_token and self.current_token.type == TokenType.FIN_L:  # Detectar fin de línea
             self.expect(TokenType.FIN_L)
+            return None
         else:
             self.error(f"Expected =, ( or ;  found {self.current_token.type}")
             self.expect(TokenType.FIN_L)
+            return None
 
 
     # VarDecl ::= = Expression ; | ;
     def VarDecl(self):
         if self.current_token and self.current_token.type == TokenType.ASSIGN_OP:
             self.expect(TokenType.ASSIGN_OP)
-            self.Expression()
+            ret = self.Expression()
+            self.expect(TokenType.FIN_L)
+            return ret
         self.expect(TokenType.FIN_L)
+        return None
 
     # Function ::= ( Params ) { StmtList }
     def Function(self):
         global recoveri
+        ret = NodoAST("funcion")
         self.expect(TokenType.OPEN_PAR)
         if recoveri == True:
             recoveri =False
-            return
-        self.Params()
+            return None
+        ret.agregar_hijo(self.Params())
         self.expect(TokenType.CLOSE_PAR)
         if recoveri == True:
             recoveri =False
-            return
+            return None
         self.expect(TokenType.KEYS_O)
         if recoveri == True:
             recoveri =False
-            return
-        self.StmtList()
+            return None
+        ret.agregar_hijo(self.StmtList())
         self.expect(TokenType.KEYS_C)
         if recoveri == True:
             recoveri =False
-            return
+            return None
+        return ret
 
     # Params ::= Type Identifier Params' | ''
     def Params(self):
         if self.current_token and self.current_token.type in {TokenType.INTEGER, TokenType.BOOL_D, TokenType.CHAR_D,
                                                                TokenType.STRING_D, TokenType.VOID_D}:
-            self.Type()
+            ret = NodoArray("Params")
+            ret.agregar_hijo(self.Type())
+            id = self.current_token.value
             self.expect(TokenType.IDENTIFIER)
-            self.ParamsPrime()
+            ret.agregar_hijo(NodoAST(id))
+            ret.agregar_hijo(self.ParamsPrime())
+            return ret
+        return None
         # Empty production
 
     # Params' ::= , Params | ''
     def ParamsPrime(self):
         if self.current_token and self.current_token.type == TokenType.COMA:
+            ret = NodoArray("ParamsP")
             self.expect(TokenType.COMA)
-            self.Params()
+            ret.agregar_hijo(self.Params())
+            return ret
+        return None
         # Empty production
 
     # StmtList ::= Statement StmtList' | ''
@@ -218,104 +261,127 @@ class Parser:
         if self.current_token and self.current_token.type in {TokenType.IF_D, TokenType.FOR_D, TokenType.RETURN_D,
                                                               TokenType.PRINT_KEY, TokenType.IDENTIFIER, TokenType.KEYS_O,TokenType.INTEGER,
                                                               TokenType.CHAR_D, TokenType.STRING_D, TokenType.BOOL_D}:
-            self.Statement()
-            self.StmtListPrime()
+            ret = NodoAST("StmList")
+            ret.agregar_hijo(self.Statement())
+            ret.agregar_hijo(self.StmtListPrime())
+            return ret
+        return None
         # Empty production
 
     # StmtList' ::= Statement StmtList' | ''
     def StmtListPrime(self):
+
         if self.current_token and self.current_token.type in {TokenType.IF_D, TokenType.FOR_D, TokenType.RETURN_D,
                                                               TokenType.PRINT_KEY, TokenType.IDENTIFIER, TokenType.KEYS_O, TokenType.INTEGER,
                                                               TokenType.CHAR_D, TokenType.STRING_D, TokenType.BOOL_D}:
-            self.Statement()
-            self.StmtListPrime()
+            ret = NodoAST("StmListP")
+            ret.agregar_hijo(self.Statement())
+            ret.agregar_hijo(self.StmtListPrime())
+            return ret
+        return None
         # Empty production
 
     # Statement ::= VarDecl | IfStmt | ForStmt | ReturnStmt | ExprStmt | PrintStmt | { StmtList }
     def Statement(self):
-            
+        ret = NodoAST("Statement")
         if self.current_token and self.current_token.type == TokenType.IF_D:
-            self.IfStmt()
+            ret.agregar_hijo(self.IfStmt())
+            return ret
         elif self.current_token and self.current_token.type == TokenType.FOR_D:
-            self.ForStmt()
+            ret.agregar_hijo(self.ForStmt())
+            return ret
         elif self.current_token and self.current_token.type == TokenType.RETURN_D:
-            self.ReturnStmt()
+            ret.agregar_hijo(self.ReturnStmt())
+            return ret
         elif self.current_token and self.current_token.type == TokenType.PRINT_KEY:
-            self.PrintStmt()
+            ret.agregar_hijo(self.PrintStmt())
+            return ret
         elif self.current_token and self.current_token.type == TokenType.IDENTIFIER:
-            self.ExprStmt()
+            ret.agregar_hijo(self.ExprStmt())
+            return ret
         elif self.current_token and self.current_token.type == TokenType.KEYS_O:
             self.expect(TokenType.KEYS_O)
-            self.StmtList()
+            ret.agregar_hijo(self.StmtList())
             self.expect(TokenType.KEYS_C)
+            return ret
         else:
-            self.Declaration()
+            ret.agregar_hijo(self.Declaration())
+            return ret
 
     # IfStmt ::= if ( Expression ) Statement else Statement
     def IfStmt(self):
         global recoveri
+        ret = NodoAST("if")
         self.expect(TokenType.IF_D)
         self.expect(TokenType.OPEN_PAR)
         if recoveri == True:
             recoveri = False
-            return
-        self.Expression()
+            return None
+        ret.agregar_hijo(self.Expression())
         self.expect(TokenType.CLOSE_PAR)
         if recoveri == True:
             recoveri = False
-            return
-        self.Statement()
+            return None
+        ret.agregar_hijo(self.Statement())
         self.expect(TokenType.ELSE_D)
         if recoveri == True:
             recoveri = False
-            return
-        self.Statement()
+            return None
+        ret.agregar_hijo(self.Statement())
+        return ret
 
     # ForStmt ::= for ( ExprStmt Expression ; ExprStmt ) Statement
     def ForStmt(self):
+        ret = NodoAST("for")
         global recoveri
         self.expect(TokenType.FOR_D)
         self.expect(TokenType.OPEN_PAR)
         if recoveri == True:
             recoveri = False
-            return
-        self.ExprStmt()
-        self.Expression()
+            return None
+        ret.agregar_hijo(self.ExprStmt())
+        ret.agregar_hijo(self.Expression())
         self.expect(TokenType.FIN_L)
         if recoveri == True:
             recoveri = False
-            return
-        self.ExprStmt()
+            return None
+        ret.agregar_hijo(self.ExprStmt())
         self.expect(TokenType.CLOSE_PAR)
         if recoveri == True:
             recoveri = False
-            return
+            return None
         self.expect(TokenType.KEYS_O)
         if recoveri == True:
             recoveri = False
-            return
-        self.Statement()
+            return None
+        ret.agregar_hijo(self.Statement())
         self.expect(TokenType.KEYS_C)
         if recoveri == True:
             recoveri = False
-            return
+            return None
+        return ret
 
     # ReturnStmt ::= return Expression ;
     def ReturnStmt(self):
+        ret = NodoAST("ReturnStmt")
         self.expect(TokenType.RETURN_D)
-        self.Expression()
+        ret.agregar_hijo(NodoAST("return"))
+        ret.agregar_hijo(self.Expression())
         self.expect(TokenType.FIN_L)
+        return ret
 
     # PrintStmt ::= print ( ExprList ) ;
     def PrintStmt(self):
         global recoveri
+        printst = NodoAST("PrintStmt")
         self.expect(TokenType.PRINT_KEY)
+        printst.agregar_hijo(NodoAST("print"))
         self.expect(TokenType.OPEN_PAR)
         if recoveri == True:
             self.expect(TokenType.FIN_L)
             recoveri =False
             return
-        self.ExprList()
+        printst.agregar_hijo(self.ExprList())
         self.expect(TokenType.CLOSE_PAR)
         if recoveri == True:
             self.expect(TokenType.FIN_L)
@@ -325,193 +391,296 @@ class Parser:
         if recoveri == True:
             recoveri =False
             return
-
+        return printst
     # ExprStmt ::= Expression ;
     def ExprStmt(self):
         global recoveri
         assig = False
-        self.Expression()
+        exstmt = NodoAST("ExprStmt")
+        
+        izq = self.Expression()
         if self.current_token and self.current_token.type == TokenType.ASSIGN_OP:
             assig = True
-            self.AssignExpr()
+            der = self.AssignExpr()
+            asig = NodoOperador("=",izq,der)
+            exstmt.agregar_hijo(asig)
+        else:
+            exstmt.agregar_hijo(izq)
+
         if assig == True:
             self.expect(TokenType.FIN_L)
             if recoveri==True:
                 self.expect(TokenType.FIN_L)
+        return exstmt
     
     def AssignExpr(self):
-        self.expect(TokenType.ASSIGN_OP)
-        self.Expr()
+        self.expect(TokenType.ASSIGN_OP) 
+        
+        return self.Expr()
         
     # ExprList ::= Expression ExprList'
     def ExprList(self):
-        self.Expression()
-        self.ExprListPrime()
+        ret = NodoAST("ExprLis")
+        ret.agregar_hijo(self.Expression())
+        ret.agregar_hijo(self.ExprListPrime())
+        return ret
 
     # ExprList' ::= , ExprList | ''
     def ExprListPrime(self):
         if self.current_token and self.current_token.type == TokenType.COMA:
+            ret = NodoAST("ExprListPrime")
             self.expect(TokenType.COMA)
-            self.ExprList()
+            ret.agregar_hijo(NodoAST(","))
+            ret.agregar_hijo(self.ExprList())
+            return ret
+        return None
         # Empty production
 
     # Expression ::= OrExpr
     def Expression(self):
-        self.OrExpr()
+        expre = NodoAST("Expression")
+        expre.agregar_hijo(self.OrExpr())
+        return expre
 
     # OrExpr ::= AndExpr OrExpr'
     def OrExpr(self):
-        self.AndExpr()
-        self.OrExprPrime()
+        orxpr=NodoAST("orExpr")
+        orxpr.agregar_hijo(self.AndExpr())
+        orxpr.agregar_hijo(self.OrExprPrime())
+        return orxpr
 
     # OrExpr' ::= || AndExpr OrExpr' | ''
     def OrExprPrime(self):
         if self.current_token and self.current_token.type == TokenType.OR_LOG:
             self.expect(TokenType.OR_LOG)
-            self.AndExpr()
-            self.OrExprPrime()
+            andxpr = self.AndExpr()
+            return NodoOperador("||",andxpr.agregar_hijo(self.OrExprPrime()))
         # Empty production
+        return None
 
     # AndExpr ::= EqExpr AndExpr'
     def AndExpr(self):
-        self.EqExpr()
-        self.AndExprPrime()
+        andxpr=NodoAST("Andxpr")
+        andxpr.agregar_hijo(self.EqExpr())
+        andxpr.agregar_hijo(self.AndExprPrime())
+        return andxpr
 
     # AndExpr' ::= && EqExpr AndExpr' | ''
     def AndExprPrime(self):
         if self.current_token and self.current_token.type == TokenType.ANDLOG:
             self.expect(TokenType.ANDLOG)
-            self.EqExpr()
-            self.AndExprPrime()
+            eqexpr = self.EqExpr()
+            return NodoOperador("&&",eqexpr.agregar_hijo(self.AndExprPrime()))
+        return None
         # Empty production
 
     # EqExpr ::= RelExpr EqExpr'
     def EqExpr(self):
-        self.RelExpr()
-        self.EqExprPrime()
+        eqxpr=NodoAST("Eqxpr")
+        eqxpr.agregar_hijo(self.RelExpr())
+        eqxpr.agregar_hijo(self.EqExprPrime())
+        return eqxpr
 
     # EqExpr' ::= == RelExpr EqExpr' | != RelExpr EqExpr' | ''
     def EqExprPrime(self):
         if self.current_token and self.current_token.type == TokenType.COMPARE_OP:
             self.expect(TokenType.COMPARE_OP)
-            self.RelExpr()
-            self.EqExprPrime()
+            rele=self.RelExpr()
+            return NodoOperador("==",rele.agregar_hijo(self.EqExprPrime()))
         elif self.current_token and self.current_token.type == TokenType.DIFF_OP:
             self.expect(TokenType.DIFF_OP)
-            self.RelExpr()
-            self.EqExprPrime()
+            rele=self.RelExpr()
+            return NodoOperador("!=",rele.agregar_hijo(self.EqExprPrime()))
         # Empty production
+        return None
 
     # RelExpr ::= Expr RelExpr'
     def RelExpr(self):
-        self.Expr()
-        self.RelExprPrime()
+        rexpr=NodoAST("RelExpr")
+        izq =self.Expr()
+        der = self.RelExprPrime()
+        if der:
+            der.hijos= [izq] + der.hijos
+            rexpr.agregar_hijo(der)
+            return rexpr
+        
+        else:
+            rexpr.agregar_hijo(izq)
+            return rexpr
 
     # RelExpr' ::= < Expr RelExpr' | > Expr RelExpr' | <= Expr RelExpr' | >= Expr RelExpr' | ''
     def RelExprPrime(self):
+        oper = self.current_token.value
         if self.current_token and self.current_token.type in {TokenType.MINOR_OP, TokenType.GREAT_OP,
                                                                TokenType.MINOREQ_OP, TokenType.GREATEQ_OP}:
+            
             self.expect(self.current_token.type)
-            self.Expr()
-            self.RelExprPrime()
+            expr = self.Expr()
+            expr.agregar_hijo(self.RelExprPrime())
+            op = NodoOperador(oper,None,expr)
+            return op
+        
+        return None
         # Empty production
 
     # Expr ::= Term Expr'
     def Expr(self):
-        self.Term()
-        self.ExprPrime()
+        expr=NodoAST("Expr")
+        izq = self.Term()
+        der = self.ExprPrime()
+        if der:
+            der.hijos= [izq] + der.hijos
+            expr.agregar_hijo(der)
+            return expr
+        
+        else:
+            expr.agregar_hijo(izq)
+            return expr
+        r
 
     # Expr' ::= + Term Expr' | - Term Expr' | ''
     def ExprPrime(self):
         if self.current_token and self.current_token.type == TokenType.ADD_OP:
             self.expect(TokenType.ADD_OP)
-            self.Term()
-            self.ExprPrime()
+            ter = self.Term()
+            ter.agregar_hijo(self.ExprPrime())
+            op = NodoOperador("+",None,ter)
+            return op
+            
         elif self.current_token and self.current_token.type == TokenType.SUB_OP:
             self.expect(TokenType.SUB_OP)
-            self.Term()
-            self.ExprPrime()
-        # Empty production
+            ter = self.Term()
+            ter.agregar_hijo(self.ExprPrime())
+            op = NodoOperador("-",None,ter)
+            return op
+        return None
 
     # Term ::= Unary Term'
     def Term(self):
-        self.Unary()
-        self.TermPrime()
+        ter=NodoAST("Term")
+        izq = self.Unary()
+        der = self.TermPrime()
+        if der:
+            der.hijos= [izq] + der.hijos
+            ter.agregar_hijo(der)
+            return ter
+        
+        else:
+            ter.agregar_hijo(izq)
+            return ter
 
     # Term' ::= * Unary Term' | / Unary Term' | % Unary Term' | ''
     def TermPrime(self):
         if self.current_token and self.current_token.type == TokenType.MULT:
             self.expect(TokenType.MULT)
-            self.Unary()
-            self.TermPrime()
+            un = self.Unary()  
+            un.agregar_hijo(self.TermPrime())
+            op = NodoOperador("*",None,un)
+            return op
         elif self.current_token and self.current_token.type == TokenType.DIV:
             self.expect(TokenType.DIV)
-            self.Unary()
-            self.TermPrime()
+            un = self.Unary()
+            un.agregar_hijo(self.TermPrime())
+            op = NodoOperador("/",None,un)
+            return op
         elif self.current_token and self.current_token.type == TokenType.MOD:
             self.expect(TokenType.MOD)
-            self.Unary()
-            self.TermPrime()
+            un =self.Unary()
+            un.agregar_hijo(self.TermPrime())
+            op = NodoOperador("%",None,un)
+            return op
         # Empty production
+        return None
 
     # Unary ::= ! Unary | - Unary | Factor
     def Unary(self):
         if self.current_token and self.current_token.type == TokenType.NEG_OP:
             self.expect(TokenType.NEG_OP)
-            self.Unary()
+            return NodoOperador('!',None,self.Unary())
         elif self.current_token and self.current_token.type == TokenType.SUB_OP:
             self.expect(TokenType.SUB_OP)
-            self.Unary()
+            return NodoOperador('-',None,self.Unary())
         else:
-            self.Factor()
+            return self.Factor()
 
     # Factor ::= Identifier FactorR | IntegerLiteral Factor' | CharLiteral Factor' | StringLiteral Factor' | BooleanLiteral Factor' | ( Expression ) Factor'
     def Factor(self):
         if self.current_token.type == TokenType.IDENTIFIER:
+            id = self.current_token.value
             self.expect(TokenType.IDENTIFIER)
-            self.FactorR()
+            nf = NodoFactor()
+            nf.agregar_hijo(NodoAST(id))
+            nf.agregar_hijo(self.FactorR())
+            return nf
         elif self.current_token.type == TokenType.L_INTEGER:
+            id = self.current_token.value
             self.expect(TokenType.L_INTEGER)
-            self.FactorPrime()
+            nf = NodoFactor()
+            nf.agregar_hijo(NodoAST(id))
+            nf.agregar_hijo(self.FactorPrime())
+            return nf
         elif self.current_token.type == TokenType.L_CHAR:
+            id = self.current_token.value
             self.expect(TokenType.L_CHAR)
-            self.FactorPrime()
+            nf = NodoFactor()
+            nf.agregar_hijo(NodoAST(id))
+            nf.agregar_hijo(self.FactorPrime())
+            return nf
         elif self.current_token.type == TokenType.L_STRING:
+            id = self.current_token.value
             self.expect(TokenType.L_STRING)
-            self.FactorPrime()
+            nf = NodoFactor()
+            nf.agregar_hijo(NodoAST(id))
+            nf.agregar_hijo(self.FactorPrime())
+            return nf
         elif self.current_token.type == TokenType.L_BOOLEAN:
+            id = self.current_token.value
             self.expect(TokenType.L_BOOLEAN)
-            self.FactorPrime()
+            nf = NodoFactor()
+            nf.agregar_hijo(NodoAST(id))
+            nf.agregar_hijo(self.FactorPrime())
+            return nf
         elif self.current_token.type == TokenType.OPEN_PAR:
+            nf = NodoFactor()
             self.expect(TokenType.OPEN_PAR)
-            self.Expression()
+            nf.agregar_hijo(self.Expression())
             self.expect(TokenType.CLOSE_PAR)
-            self.FactorPrime()
+            nf.agregar_hijo(self.FactorPrime())
+            return nf
 
     # FactorR ::= Factor' | ( ExprList ) Factor'
     def FactorR(self):
         global recoveri
         if self.current_token and self.current_token.type == TokenType.OPEN_PAR:
+            facR = NodoAST("FactorR")
             self.expect(TokenType.OPEN_PAR)
-            self.ExprList()
+            facR.agregar_hijo(self.ExprList())
             self.expect(TokenType.CLOSE_PAR)
             global recoveri
             if recoveri == True:
                 recoveri =False
                 return
-            self.FactorPrime()
+            facR.agregar_hijo(self.FactorPrime())
+            return facR
         else:
-            self.FactorPrime()
+            facR = NodoAST("FactorR")
+            hj=self.FactorPrime()
+            if hj != None:
+                facR.agregar_hijo()
+                return facR
+            return None
 
     # Factor' ::= [ Expression ] Factor' | ''
     def FactorPrime(self):
         global recoveri
         if self.current_token and self.current_token.type == TokenType.OPEN_CHE:
+            factpri = NodoAST("FactorPrime")
             self.expect(TokenType.OPEN_CHE)
-            self.Expression()
+            factpri.agregar_hijo(self.Expression())
             self.expect(TokenType.CLOSE_CHE)
             if recoveri == True:
                 recoveri =False
                 return
-            self.FactorPrime()
-        # Empty production
+            factpri.agregar_hijo(self.FactorPrime())
+            return factpri
+        return None

@@ -1,0 +1,21 @@
+Program
+├── Declaration
+│   └── Aux
+│       ├── Identifier
+│       │   └── x
+│       └── Type
+│           └── integer
+├── Declaration
+│   ├── Aux
+│   │   ├── Identifier
+│   │   │   └── myFunction
+│   │   └── Type
+│   │       └── VOID
+│   └── Function
+└── Declaration
+    ├── Aux
+    │   ├── Identifier
+    │   │   └── b
+    │   └── Type
+    │       └── integer
+    └── VarDecl

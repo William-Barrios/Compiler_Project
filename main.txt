@@ -1,5 +1,5 @@
-integer x;
-void myFunction (){
+integer x= 5*4;
+void myFunction (c){
     if (a<b){
         a = !4;
         x = !4;

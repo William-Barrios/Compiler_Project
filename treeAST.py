@@ -1,200 +1,140 @@
+from graphviz import Digraph
 
+class NodoAST:
+    def __init__(self, tipo, valor=None):
+        self.tipo = tipo  # Tipo del nodo, e.g., 'For', 'Operador', etc.
+        self.valor = valor  # Valor específico del nodo, si aplica
+        self.hijos = []  # Lista de hijos del nodo
 
-class ASTNode:
-    def __init__(self, name):
-        self.name = name
-        self.children = []
+    def agregar_hijo(self, nodo_hijo):
+        """Agrega un nodo hijo."""
+        if nodo_hijo != None: self.hijos.append(nodo_hijo)
 
-    def add_child(self, node):
-        self.children.append(node)
+    def graficar(self):
+        dot = Digraph(comment="AST")
 
-    def __repr__(self, level=0):
-        ret = "\t" * level + repr(self.name) + "\n"
-        for child in self.children:
-            ret += child.__repr__(level + 1)
-        return ret
+        def agregar_nodos_aristas(nodo, dot, parent_id=None):
+            if nodo is None:  # Verificar que el nodo no sea None
+                return
+            
+            node_id = id(nodo)
+            label = f"{nodo.tipo}: {nodo.valor}" if nodo.valor else nodo.tipo
+            dot.node(str(node_id), label)
+            
+            if parent_id:
+                dot.edge(str(parent_id), str(node_id))
 
-    def generate_code(self):
-        return ""  # Método general a sobreescribir en nodos específicos
+            for hijo in nodo.hijos:
+                agregar_nodos_aristas(hijo, dot, node_id)
 
+        agregar_nodos_aristas(self, dot)
+        return dot
 
-# Nodo principal del programa
-class ProgramNode(ASTNode):
-    def __init__(self):
-        super().__init__("Program")
+    def exportar_ast_grafico(self, filename="AST_Grafico", formato="png"):
+        """Exporta el AST como un gráfico a un archivo de imagen."""
+        dot = self.graficar()
+        dot.format = formato
+        dot.render(filename, view=False)  # view=True abre la imagen automáticamente
+        print(f"AST exportado como {filename}.{formato}")
 
+class NodoDeclaracion(NodoAST):
+    def __init__(self, tipovar, nombre_variable):
+        super().__init__("Declaracion")
+        self.tipovar = tipovar
+        self.nombre_variable = nombre_variable
 
-# Nodo para declaraciones generales
-class DeclarationNode(ASTNode):
-    def __init__(self, name):
-        super().__init__(name)
-
-
-# Nodo para la declaración de variables
-class VarDeclNode(ASTNode):
-    def __init__(self, identifier, expression=None):
-        super().__init__("VarDecl")
-        self.identifier = identifier
-        self.expression = expression
-
-    def generate_code(self):
-        code = f"{self.identifier} = {self.expression.generate_code() if self.expression else ''};"
-        return code
-
-
-# Nodo para la declaración de funciones
-class FunctionNode(ASTNode):
-    def __init__(self, identifier, params, body):
+class NodoFunctionAt(NodoAST):
+    def __init__(self, izquierdo=None, derecho=None):
         super().__init__("Function")
-        self.identifier = identifier
-        self.params = params  # Nodo Params
-        self.body = body      # Nodo StmtList
+        self.izquierdo = izquierdo
+        self.derecho = derecho
+        if izquierdo: self.agregar_hijo(izquierdo)
+        if derecho: self.agregar_hijo(derecho)
 
-    def generate_code(self):
-        params_code = self.params.generate_code()
-        body_code = self.body.generate_code()
-        return f"function {self.identifier}({params_code}) {{\n{body_code}\n}}"
+class NodoTypeCor(NodoAST):
+    def __init__(self, izquierdo=None, derecho=None):
+        super().__init__("literal []")
+        self.izquierdo = izquierdo
+        self.derecho = derecho
+        if izquierdo: self.agregar_hijo(izquierdo)
+        if derecho: self.agregar_hijo(derecho)
 
+class NodoUnary(NodoAST):
+    def __init__(self, nombre, hijo=None):
+        super().__init__("unary")
+        self.nombre = nombre
+        self.hijo = hijo
+        if hijo: self.agregar_hijo(hijo)
 
-# Nodo para parámetros de funciones
-class ParamsNode(ASTNode):
+class NodoFactor(NodoAST):
     def __init__(self):
-        super().__init__("Params")
-
-    def generate_code(self):
-        return ", ".join(child.generate_code() for child in self.children)
+        super().__init__("Factor")
 
 
-# Nodo para una lista de sentencias (cuerpo de la función o bloques)
-class StmtListNode(ASTNode):
-    def __init__(self):
-        super().__init__("StmtList")
-
-    def generate_code(self):
-        return "\n".join(child.generate_code() for child in self.children)
-
-
-# Nodo base para sentencias (Statement)
-class StatementNode(ASTNode):
+class NodoLeaf(NodoAST):
     def __init__(self, name):
-        super().__init__(name)
-
-
-# Nodo para sentencias de impresión
-class PrintStmtNode(StatementNode):
-    def __init__(self, expr_list):
-        super().__init__("PrintStmt")
-        self.expr_list = expr_list
-
-    def generate_code(self):
-        return f"print({self.expr_list.generate_code()});"
-
-
-# Nodo para sentencias de retorno
-class ReturnStmtNode(StatementNode):
-    def __init__(self, expression):
-        super().__init__("ReturnStmt")
-        self.expression = expression
-
-    def generate_code(self):
-        return f"return {self.expression.generate_code()};"
-
-
-# Nodo para expresiones de asignación
-class AssignExprNode(ASTNode):
-    def __init__(self, identifier, value):
-        super().__init__("AssignExpr")
-        self.identifier = identifier
-        self.value = value
-
-    def generate_code(self):
-        return f"{self.identifier} = {self.value.generate_code()};"
-
-
-# Nodo base para expresiones (Expression)
-class ExpressionNode(ASTNode):
-    def __init__(self, expr_type, value=None):
-        super().__init__(expr_type)
-        self.value = value
-
-    def generate_code(self):
-        return str(self.value)
-
-
-# Nodo para expresiones binarias (por ejemplo, +, -, *, /)
-class BinaryExprNode(ExpressionNode):
-    def __init__(self, left, operator, right):
-        super().__init__("BinaryExpr")
-        self.left = left
-        self.operator = operator
-        self.right = right
-
-    def generate_code(self):
-        return f"({self.left.generate_code()} {self.operator} {self.right.generate_code()})"
-
-
-# Nodo para expresiones unarias (por ejemplo, -x, !x)
-class UnaryExprNode(ExpressionNode):
-    def __init__(self, operator, operand):
-        super().__init__("UnaryExpr")
-        self.operator = operator
-        self.operand = operand
-
-    def generate_code(self):
-        return f"({self.operator}{self.operand.generate_code()})"
-
-
-# Nodo para literales (números, cadenas, booleanos)
-class LiteralNode(ExpressionNode):
-    def __init__(self, value):
-        super().__init__("Literal", value)
-
-    def generate_code(self):
-        return str(self.value)
-
-
-# Nodo para identificadores (variables)
-class IdentifierNode(ExpressionNode):
-    def __init__(self, name):
-        super().__init__("Identifier")
+        super().__init__("")
         self.name = name
 
-    def generate_code(self):
-        return self.name
+class NodoFunction(NodoAST):
+    def __init__(self, nombre, izquierdo=None, derecho=None):
+        super().__init__("Unary")
+        self.nombre = nombre
+        self.izquierdo = izquierdo
+        self.derecho = derecho
+        if izquierdo: self.agregar_hijo(izquierdo)
+        if derecho: self.agregar_hijo(derecho)
 
 
-# Nodo para listas de expresiones, como en una llamada a print(x, y, z)
-class ExprListNode(ASTNode):
-    def __init__(self):
-        super().__init__("ExprList")
 
-    def generate_code(self):
-        return ", ".join(child.generate_code() for child in self.children)
+class NodoOperador(NodoAST):
+    def __init__(self, operador, izquierdo=None, derecho=None):
+        super().__init__("Operador", operador)
+        self.izquierdo = izquierdo
+        self.derecho = derecho
+        if izquierdo: self.agregar_hijo(izquierdo)
+        if derecho: self.agregar_hijo(derecho)
 
+class NodoLiteral(NodoAST):
+    def __init__(self, valor, derecho=None):
+        super().__init__("literal")
+        self.valor = valor
+        self.derecho = derecho
+        if derecho: self.agregar_hijo(derecho)
 
-# Nodo para condiciones if
-class IfStmtNode(StatementNode):
-    def __init__(self, condition, true_stmt, false_stmt=None):
-        super().__init__("IfStmt")
-        self.condition = condition
-        self.true_stmt = true_stmt
-        self.false_stmt = false_stmt
+class NodoArray(NodoAST):
+    def __init__(self, izquierdo=None, derecho=None):
+        super().__init__("Array")
+        self.izquierdo = izquierdo
+        self.derecho = derecho
+        if izquierdo: self.agregar_hijo(izquierdo)
+        if derecho: self.agregar_hijo(derecho)
 
-    def generate_code(self):
-        code = f"if ({self.condition.generate_code()}) {{\n{self.true_stmt.generate_code()}\n}}"
-        if self.false_stmt:
-            code += f" else {{\n{self.false_stmt.generate_code()}\n}}"
-        return code
+class NodoExprFact(NodoAST):
+    def __init__(self, izquierdo=None, derecho=None):
+        super().__init__("ExprFact")
+        self.izquierdo = izquierdo
+        self.derecho = derecho
+        if izquierdo: self.agregar_hijo(izquierdo)
+        if derecho: self.agregar_hijo(derecho)
 
+class NodoIf(NodoAST):
+    def __init__(self, condicion):
+        super().__init__("If")
+        self.condicion = condicion
+        self.cuerpo_if = []
+        self.cuerpo_else = []
 
-# Nodo para bucles for
-class ForStmtNode(StatementNode):
-    def __init__(self, init, condition, increment, body):
-        super().__init__("ForStmt")
-        self.init = init
-        self.condition = condition
-        self.increment = increment
-        self.body = body
+class NodoWhile(NodoAST):
+    def __init__(self, condicion):
+        super().__init__("While")
+        self.condicion = condicion
+        self.cuerpo = []
 
-    def generate_code(self):
-        return f"for ({self.init.generate_code()} {self.condition.generate_code()}; {self.increment.generate_code()}) {{\n{self.body.generate_code()}\n}}"
+class NodoFor(NodoAST):
+    def __init__(self, inicializacion, condicion, incremento):
+        super().__init__("For")
+        self.inicializacion = inicializacion
+        self.condicion = condicion
+        self.incremento = incremento
+        self.cuerpo = []

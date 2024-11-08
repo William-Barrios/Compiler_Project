@@ -1,10 +1,12 @@
 
 import re
 from parser import Parser
+from treeAST import *
 class TokenType:
     IDENTIFIER = 'IDENTIFIER'
     L_INTEGER = 'L_INTEGER'
     L_CHAR = 'L_CHAR'
+    OR_OP = 'OR_OP'
     L_STRING = 'L_STRING'
     L_BOOLEAN = 'L_BOOLEAN'
     INTEGER = 'integer'
@@ -90,6 +92,10 @@ keywords = {
 def is_keyword(word):
     return word in keywords
 
+def graficar_ast(self, filename="AST_Programa"):
+        dot = self.ast_root.graficar()
+        dot.format = "png"
+        dot.render(filename)
 
 def getchar():
     global file_index, current_char, current_line, current_column, errorScanner
@@ -200,6 +206,13 @@ def get_token():
         elif current_char == ';':
                 token = Token(TokenType.FIN_L, ';', current_line, current_column)
                 #print(f"DEBUG SCAN - FIN_L [ ; ] found at ({current_line}:{current_column})")
+        elif current_char == '*':
+            if peekchar() != '/':
+                token = Token(TokenType.MULT, '*', current_line, current_column)
+        elif current_char == '/':
+            if peekchar() != '/':
+                token = Token(TokenType.DIV, '/', current_line, current_column)      
+
         elif current_char == '<':
             if peekchar() == '=':
                 token = Token(TokenType.MINOREQ_OP, '<=', current_line, current_column)
@@ -222,7 +235,13 @@ def get_token():
         elif current_char == '!':
                 token = Token(TokenType.NEG_OP, '!', current_line, current_column)
                 #print(f"DEBUG SCAN - NEG_OP [ ! ] found at ({current_line}:{current_column})")
-        
+        elif current_char == '|':
+            if peekchar() == '|':
+                token = Token(TokenType.OR_OP, '||', current_line, current_column)
+                #print(f"DEBUG SCAN - GREATEQ_OP [ >= ] found at ({current_line}:{current_column})")
+                getchar()
+            else:
+                print(f"ERROR SCAN - Unclosed char literal starting at ({current_line}:{start_column})")
         elif current_char == '(':
             token = Token(TokenType.OPEN_PAR, '(', current_line, current_column)
             #print(f"DEBUG SCAN - OPEN_PAR [ ( ] found at ({current_line}:{current_column})")
@@ -252,6 +271,8 @@ def get_token():
             errorScanner = True
             print(f"ERROR SCAN [ \"{current_char}\" ] found at ({current_line}:{current_column})")
 
+        
+
         if token and errorScanner == False:
             return token
     return None
@@ -272,7 +293,10 @@ def scan_file(filename):
 
 tokens = scan_file('main.txt')  # Usando tu scanner para generar tokens
 parser = Parser(tokens)
-parser.parse()
+root, errores = parser.parse()
+if errores == 0:
+    dot = root.graficar()
+    root.exportar_ast_grafico("AST_Programa", "png")
 
 
 
