@@ -106,6 +106,8 @@ class Parser:
             ret.agregar_hijo(self.Declaration())
             ret.agregar_hijo(self.ProgramPrime())
             return ret
+        if self.current_token_index<len(self.tokens)-1:
+            self.error("se esperaba tipo de var")
         return None
         
 
@@ -236,7 +238,7 @@ class Parser:
     def Params(self):
         if self.current_token and self.current_token.type in {TokenType.INTEGER, TokenType.BOOL_D, TokenType.CHAR_D,
                                                                TokenType.STRING_D, TokenType.VOID_D}:
-            ret = NodoArray("Params")
+            ret = NodoAST("Params")
             ret.agregar_hijo(self.Type())
             id = self.current_token.value
             self.expect(TokenType.IDENTIFIER)
